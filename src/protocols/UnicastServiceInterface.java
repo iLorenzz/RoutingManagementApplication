@@ -1,3 +1,3 @@
 public interface UnicastServiceInterface {
-    boolean UpDataReq(short destination, String message);
+    boolean up_data_req(short destination, String message);
 }
