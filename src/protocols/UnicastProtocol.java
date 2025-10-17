@@ -1,13 +1,11 @@
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Scanner;
 import java.util.concurrent.ConcurrentMap;
 
 public class UnicastProtocol implements UnicastServiceInterface, Runnable{
-    private static ConcurrentMap<Short, EntityConfig> entity_map;
+    private static ConcurrentMap<Short, UnicastEntity> entity_map;
 
     private short ucsap_id;
     private InetAddress host_name;
@@ -20,11 +18,11 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
             System.out.println(e.getMessage());
         }
 
-        EntityConfig this_unicast_entity_config = read_config_file();
+        UnicastEntity this_unicast_entity_config = read_config_file();
         entity_map.put(ucsap_id, this_unicast_entity_config);
     }
 
-    private EntityConfig read_config_file() throws Exception{
+    private UnicastEntity read_config_file() throws Exception{
         String configuration_file_path = "configuration.txt";
         String[] found_correct_configuration = null;
 
@@ -40,7 +38,7 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
             }
 
             if(found_correct_configuration != null){
-                return new EntityConfig(found_correct_configuration[1], Integer.parseInt(found_correct_configuration[2]));
+                return new UnicastEntity(found_correct_configuration[1], Integer.parseInt(found_correct_configuration[2]));
             }
 
         }catch(Exception e){

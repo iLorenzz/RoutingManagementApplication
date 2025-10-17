@@ -1,8 +1,8 @@
-public class EntityConfig {
+public class UnicastEntity {
     private final String host_name;
     private final int port_number;
 
-    public EntityConfig(String host_name, int port_number)throws Exception{
+    public UnicastEntity(String host_name, int port_number)throws Exception{
         this.host_name = host_name;
         if(port_number <= 1024 || port_number > 65535){
             throw new Exception();
