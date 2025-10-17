@@ -1,2 +1,3 @@
-public class UnicastServiceUserInterface {
+public interface UnicastServiceUserInterface {
+
 }
