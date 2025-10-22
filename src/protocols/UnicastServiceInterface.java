@@ -1,3 +1,5 @@
+import java.net.UnknownHostException;
+
 public interface UnicastServiceInterface {
-    boolean up_data_req(short destination, String message);
+    boolean up_data_req(short destination, String message) throws UnknownHostException;
 }

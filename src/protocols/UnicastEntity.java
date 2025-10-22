@@ -5,23 +5,29 @@ import java.util.Scanner;
 
 public class UnicastEntity implements  Runnable{
 
-    private short ucsap_id;
+    private final short ucsap_id;
     private final String host_name;
     private final int port_number;
 
-    public UnicastEntity(String host_name, int port_number)throws Exception{
+    private final UnicastProtocol unicast_protocol;
+
+    public UnicastEntity(short ucsap_id, String host_name, int port_number)throws Exception{
+        this.ucsap_id = ucsap_id;
         this.host_name = host_name;
         if(port_number <= 1024 || port_number > 65535){
             throw new Exception();
         }
 
-        /*try {
-            this.host_name = InetAddress.getByName(host_name);
-        }catch(UnknownHostException e) {
-            System.out.println(e.getMessage());
-        }*/
-
         this.port_number = port_number;
+
+        String[] entity_information = {host_name, Integer.toString(port_number)};
+
+        unicast_protocol = new UnicastProtocol();
+        UnicastProtocol.setEntity_map(ucsap_id, entity_information);
+    }
+
+    public short getUcsap_id() {
+        return ucsap_id;
     }
 
     public int getPort_number() {
@@ -32,36 +38,21 @@ public class UnicastEntity implements  Runnable{
         return host_name;
     }
 
-    @Override
-    public void run() {
-
+    public void send_message(short destination, String message){
+        try {
+            if (!unicast_protocol.up_data_req(destination, message)) {
+                //Todo exception
+                System.out.println("Error: illegal message");
+            }
+        } catch (UnknownHostException e) {
+            System.out.println(e.getMessage());
+        }
     }
 
-    //put in main file
-    private UnicastEntity read_config_file() throws Exception{
-        String configuration_file_path = "configuration.txt";
-        String[] found_correct_configuration = null;
-
-        try(Scanner sc = new Scanner(new File(configuration_file_path))){
-            while(sc.hasNextLine()){
-                String config = sc.nextLine();
-
-                String[] separated_configs = config.split("");
-                if(Short.parseShort(separated_configs[0]) == ucsap_id){
-                    found_correct_configuration = separated_configs;
-                    break;
-                }
-            }
-
-            if(found_correct_configuration != null){
-                return new UnicastEntity(found_correct_configuration[1], Integer.parseInt(found_correct_configuration[2]));
-            }
-
-        }catch(Exception e){
-            System.err.println(e.getMessage());
+    @Override
+    public void run() {
+        while(true){
+            unicast_protocol.receiveMessage(port_number);
         }
-
-        //TODO  implement exception if this ucsap_id was not found
-        throw new Exception();
     }
 }
