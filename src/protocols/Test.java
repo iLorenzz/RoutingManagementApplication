@@ -38,6 +38,8 @@ public class Test {
 
                 allConfiguredEntities.get(Integer.parseInt(selected_host)).send_message(host_to_receive, message);
 
+                Thread.sleep(500);
+
             }while(!selected_host.equals("exit"));
 
         }catch (Exception e){

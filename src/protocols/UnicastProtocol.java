@@ -20,6 +20,7 @@ public class UnicastProtocol implements UnicastServiceInterface{
 
     public static void setEntity_map(Short id, String[] entity_information) {
         entity_map.put(id, entity_information);
+        System.out.println(Arrays.toString(entity_map.get(id)));
     }
 
     @Override
@@ -58,16 +59,7 @@ public class UnicastProtocol implements UnicastServiceInterface{
             DatagramPacket requestPack = new DatagramPacket(buffer, buffer.length);
             datagram.receive(requestPack);
 
-            String request_address = requestPack.getAddress().toString();
-            String request_port = Integer.toString(requestPack.getPort());
-            String[] request_entity_information = {request_address, request_port};
-
-            short source = -1;
-            for(Map.Entry<Short, String[]> entry : entity_map.entrySet()){
-                if(Arrays.equals(entry.getValue(), request_entity_information)){
-                    source = entry.getKey();
-                }
-            }
+            short source = UnicastEntity.getLastSender();
 
             String message = new String(requestPack.getData());
 

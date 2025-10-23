@@ -2,8 +2,10 @@ import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Scanner;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class UnicastEntity implements  Runnable{
+    private static short lastEntitySender = -1;
 
     private final short ucsap_id;
     private final String host_name;
@@ -44,6 +46,7 @@ public class UnicastEntity implements  Runnable{
                 //Todo exception
                 System.out.println("Error: illegal message");
             }
+            lastEntitySender = this.ucsap_id;
         } catch (UnknownHostException e) {
             System.out.println(e.getMessage());
         }
@@ -54,5 +57,9 @@ public class UnicastEntity implements  Runnable{
         while(true){
             unicast_protocol.receiveMessage(port_number);
         }
+    }
+
+    public static short getLastSender(){
+        return lastEntitySender;
     }
 }
