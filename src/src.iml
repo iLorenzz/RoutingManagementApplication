@@ -6,9 +6,6 @@
       <sourceFolder url="file://$MODULE_DIR$/protocols" isTestSource="false" />
     </content>
     <orderEntry type="inheritedJdk" />
-    <orderEntry type="library" exported="" name="hexworks.zircon.core.jvm" level="project" />
-    <orderEntry type="library" exported="" name="hexworks.zircon.jvm.swing" level="project" />
-    <orderEntry type="library" exported="" name="slf4j.api" level="project" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

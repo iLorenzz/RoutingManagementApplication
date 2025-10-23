@@ -50,7 +50,7 @@ public class Test {
     }
 
     private static List<UnicastEntity> read_config_file() throws Exception{
-        String configuration_file_path = "/home/lorenz/Documentos/USP/projects/redes_project/RoutingManagementApplication/src/protocols/configuration.txt";
+        String configuration_file_path = "src/protocols/configuration.txt";
         List<UnicastEntity> allConfiguredEntities = new ArrayList<>();
 
         try(Scanner sc = new Scanner(new File(configuration_file_path))){
