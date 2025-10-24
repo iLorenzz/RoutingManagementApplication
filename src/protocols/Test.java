@@ -1,73 +1,116 @@
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
 public class Test {
-    public static void main(String[] args){
-        List<Thread> thread_entities = new ArrayList<>();
-        String selected_host;
 
-        try {
-            List<UnicastEntity> allConfiguredEntities = read_config_file();
+	public static void main(String[] args) {
+		List<Thread> thread_entities = new ArrayList<>();
+		short selected_host = 0;
+		short selected_receiver = 0;
+		String message;
+		String input;
 
-            for (UnicastEntity allConfiguredEntity : allConfiguredEntities) {
-                Thread newThread = new Thread(allConfiguredEntity);
-                thread_entities.add(newThread);
-            }
+		List exitCommands = List.of("exit", "q", "quit", "sair");
 
-            for(Thread threadEntity : thread_entities){
-                threadEntity.start();
-            }
-            Scanner sc = new Scanner(System.in);
+		try {
+			List<UnicastEntity> allConfiguredEntities = read_config_file();
 
-            do {
-                System.out.println("----------------Select an host to send a message----------------");
-                for (UnicastEntity entity : allConfiguredEntities) {
-                    System.out.println("ID = " + entity.getUcsap_id());
-                }
-                System.out.println("exit: to finish the program");
+			for (UnicastEntity allConfiguredEntity : allConfiguredEntities) {
+				Thread newThread = new Thread(allConfiguredEntity);
+				thread_entities.add(newThread);
+				newThread.start();
+			}
 
-                selected_host = sc.nextLine();
+			Scanner sc = new Scanner(System.in);
 
-                System.out.println("Enter a message");
-                String message = sc.nextLine();
+			while(true) {
+				System.out.println("==================================");
+				System.out.println("Available Hosts");
+				System.out.println("----------------------------------");
+				System.out.println("  id | 'host name' : 'port'");
+				System.out.println("----------------------------------");
 
-                System.out.println("Select an host to receive the message");
-                short host_to_receive = Short.parseShort(sc.nextLine());
+				allConfiguredEntities.forEach(entity -> {System.out.println("-> " + entity.getUcsap_id() + " | " + entity.getHost_name() + " : " + entity.getPort_number());});
+				System.out.println("----------------------------------");
 
-                allConfiguredEntities.get(Integer.parseInt(selected_host)).send_message(host_to_receive, message);
+				System.out.print("Sender ID: ");
+				input = sc.nextLine();
+				try {
+					selected_host = Short.parseShort(input);
+					final short atomicSelectedSender = selected_host;
+					if (allConfiguredEntities.stream().noneMatch(entity -> {return entity.getUcsap_id() == atomicSelectedSender;})) {
+						throw new NumberFormatException();
+					};
+				} catch (NumberFormatException e) {
+					if (exitCommands.contains(input)) {break;}
+					System.out.println("\n==================================");
+					System.out.println("!!! Invalid Host ID !!!");
+					System.out.println("==================================\n");
+					continue;
+				}
 
-                Thread.sleep(500);
+				System.out.print("Receiver ID: ");
+				input = sc.nextLine();
+				try {
+					selected_receiver = Short.parseShort(input);
+					final short atomicSelectedReceiver = selected_receiver;
+					if (allConfiguredEntities.stream().noneMatch(entity -> {return entity.getUcsap_id() == atomicSelectedReceiver;})) {
+						throw new NumberFormatException();
+					};
+				} catch (NumberFormatException e) {
+					if (exitCommands.contains(input)) {break;}
+					System.out.println("\n==================================");
+					System.out.println("!!! Invalid Host ID !!!");
+					System.out.println("==================================\n");
+					continue;
+				}
 
-            }while(!selected_host.equals("exit"));
+				System.out.print("Message: ");
+				message = sc.nextLine();
+				if (exitCommands.contains(message)) {break;}
 
-        }catch (Exception e){
-            //todo: fix to correct exception
-            e.getStackTrace();
-        }
+				allConfiguredEntities
+					.get(selected_host)
+					.send_message(selected_receiver, message);
 
-    }
+				Thread.sleep(500);
+			}
+		} catch (Exception e) {
+			//todo: fix to correct exception
+			e.getStackTrace();
+		}
+		System.out.println("Goodbye");
+		thread_entities.forEach(Thread::interrupt);
+		System.exit(0);
+	}
 
-    private static List<UnicastEntity> read_config_file() throws Exception{
-        String configuration_file_path = "src/protocols/configuration.txt";
-        List<UnicastEntity> allConfiguredEntities = new ArrayList<>();
+	private static List<UnicastEntity> read_config_file() throws FileNotFoundException {
+		String configuration_file_path = "src/protocols/configuration.txt";
+		List<UnicastEntity> allConfiguredEntities = new ArrayList<>();
 
-        try(Scanner sc = new Scanner(new File(configuration_file_path))){
-            while(sc.hasNextLine()){
-                String config = sc.nextLine();
+		Scanner sc = new Scanner(new File(configuration_file_path));
+		while (sc.hasNextLine()) {
+			String config = sc.nextLine();
+			String[] separated_configs = config.split(" ");
+			try {
+				allConfiguredEntities.add(
+						new UnicastEntity(
+								Short.parseShort(separated_configs[0]),
+								separated_configs[1],
+								Integer.parseInt(separated_configs[2])
+						)
+				);
+			} catch (IllegalArgumentException exception){
+				System.out.println("\n========================================================");
+				System.err.println(exception.getMessage());
+				System.out.println("Proceeding with operation; faulty data will NOT be used.");
+				System.out.println("========================================================\n");
+			}
+		}
 
-                String[] separated_configs = config.split(" ");
-                allConfiguredEntities.add(new UnicastEntity(Short.parseShort(separated_configs[0]), separated_configs[1], Integer.parseInt(separated_configs[2])));
-            }
-
-            return allConfiguredEntities;
-
-        }catch(Exception e){
-            System.err.println(e.getMessage());
-        }
-
-        //TODO  implement exception if this ucsap_id was not found
-        throw new Exception();
-    }
+		return allConfiguredEntities;
+	}
 }

@@ -5,6 +5,6 @@ public class RoutingInformationProtocol implements UnicastServiceUserInterface{
 
     @Override
     public void up_data_ind(short source, String message){
-        System.out.println("Message from " + source + ":" + " " + message);
+        System.out.println("\nMessage from " + source + ":" + " \"" + message + "\"\n");
     }
 }
