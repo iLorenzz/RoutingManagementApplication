@@ -52,6 +52,7 @@ public class UnicastProtocol implements UnicastServiceInterface{
         return format_message.getBytes();
     }
 
+    /*
     public void receiveMessage(int port){
         try(DatagramSocket datagram = new DatagramSocket(port)){
             byte[] buffer = new byte[1024];
@@ -67,5 +68,5 @@ public class UnicastProtocol implements UnicastServiceInterface{
         } catch (Exception e) {
             System.out.println(e.getMessage());
         }
-    }
+    }*/
 }

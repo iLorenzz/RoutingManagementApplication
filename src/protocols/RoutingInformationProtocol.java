@@ -7,12 +7,13 @@ public class RoutingInformationProtocol implements UnicastServiceUserInterface, 
 
     public RoutingInformationProtocol() {
         this.unicastProtocol = new UnicastProtocol();
-        this.routingManagementApplication= new RoutingManagementApplication();
+        this.routingManagementApplication= new RoutingManagementApplication("localhost", 8088);
     }
 
     @Override
     public void upDataInd(short source, String message){
-        System.out.println("\nMessage from " + source + ":" + " \"" + message + "\"\n");
+        //System.out.println("\nMessage from " + source + ":" + " \"" + message + "\"\n");
+
     }
 
     @Override

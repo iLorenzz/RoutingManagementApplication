@@ -55,7 +55,7 @@ public class UnicastEntity implements Runnable {
 
 	@Override
 	public void run() {
-		unicast_protocol.receiveMessage(port_number);
+		//unicast_protocol.receiveMessage(port_number);
 	}
 
 	public static short getLastSender() {

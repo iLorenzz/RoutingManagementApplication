@@ -1,8 +1,13 @@
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.SortedMap;
 import java.util.SortedSet;
 
 public class Node implements Runnable{
+    private static short lastNodeSender = -1;
+
 	private final short ucsapId;
 	private final String hostName;
 	private final int portNumber;
@@ -13,6 +18,7 @@ public class Node implements Runnable{
 	// Neighbor's distance vectors are accessed by using their ucsapIds
 
 	private final UnicastProtocol unicastProtocol;
+    private final RoutingInformationProtocol routingInformationProtocol;
 
 
 	public Node(short ucsapId, String hostName, int portNumber) {
@@ -30,14 +36,16 @@ public class Node implements Runnable{
 
 		this.unicastProtocol = new UnicastProtocol();
         UnicastProtocol.setEntity_map(ucsapId, entityInformation);
+
+        this.routingInformationProtocol = new RoutingInformationProtocol();
 	}
 
-    public void send_message(short destination, String message) {
+    public void sendMessage(short destination, String message) {
         try {
             if (!unicastProtocol.up_data_req(destination, message)) {
                 System.out.println("Error: illegal message");
             }
-            //lastEntitySender = this.ucsap_id;
+            lastNodeSender = this.ucsapId;
         } catch (UnknownHostException e) {
             System.out.println(e.getMessage());
         }
@@ -45,7 +53,23 @@ public class Node implements Runnable{
 
     @Override
     public void run() {
-        unicastProtocol.receiveMessage(portNumber);
+        //unicastProtocol.receiveMessage(portNumber);
+
+        try(DatagramSocket datagram = new DatagramSocket(portNumber)){
+            byte[] buffer = new byte[1024];
+
+            DatagramPacket requestPack = new DatagramPacket(buffer, buffer.length);
+            datagram.receive(requestPack);
+
+            //short source = UnicastEntity.getLastSender();
+
+            String message = new String(requestPack.getData());
+            InetAddress source = requestPack.getAddress();
+
+            routingInformationProtocol.upDataInd(lastNodeSender, message);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+        }
     }
 
     /*public static short getLastSender() {
