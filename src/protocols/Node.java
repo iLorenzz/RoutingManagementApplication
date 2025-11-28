@@ -1,7 +1,8 @@
+import java.net.UnknownHostException;
 import java.util.SortedMap;
 import java.util.SortedSet;
 
-public class Node {
+public class Node implements Runnable{
 	private final short ucsapId;
 	private final String hostName;
 	private final int portNumber;
@@ -28,5 +29,26 @@ public class Node {
 		};
 
 		this.unicastProtocol = new UnicastProtocol();
+        UnicastProtocol.setEntity_map(ucsapId, entityInformation);
 	}
+
+    public void send_message(short destination, String message) {
+        try {
+            if (!unicastProtocol.up_data_req(destination, message)) {
+                System.out.println("Error: illegal message");
+            }
+            //lastEntitySender = this.ucsap_id;
+        } catch (UnknownHostException e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
+    @Override
+    public void run() {
+        unicastProtocol.receiveMessage(portNumber);
+    }
+
+    /*public static short getLastSender() {
+        return lastEntitySender;
+    }*/
 }

@@ -63,7 +63,7 @@ public class UnicastProtocol implements UnicastServiceInterface{
 
             String message = new String(requestPack.getData());
 
-            routingInformationProtocol.up_data_ind(source, message);
+            routingInformationProtocol.upDataInd(source, message);
         } catch (Exception e) {
             System.out.println(e.getMessage());
         }
