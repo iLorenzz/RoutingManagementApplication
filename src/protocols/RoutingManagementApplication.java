@@ -2,8 +2,10 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 
 public class RoutingManagementApplication implements RoutingProtocolManagementServiceUserInterface, Runnable{
-    public RoutingManagementApplication(){
+    private RoutingInformationProtocolManagement routingInformationProtocolManagement;
 
+    public RoutingManagementApplication(String hostname, int portNumber){
+        this.routingInformationProtocolManagement = new RoutingInformationProtocolManagement(hostname, portNumber, this);
     }
 
     @Override

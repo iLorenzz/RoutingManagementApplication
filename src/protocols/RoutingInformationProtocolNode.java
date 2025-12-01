@@ -1,12 +1,12 @@
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.UnknownHostException;
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class RoutingInformationProtocolNode extends RoutingInformationProtocol implements UnicastServiceUserInterface, Runnable {
+
+public class RoutingInformationProtocolNode extends RoutingInformationProtocol implements UnicastServiceUserInterface{
     private final short nodeId;
 
     private final int[][] distanceTable;
@@ -15,8 +15,8 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
     private final List<Short> neighbors;
 
     private final int propagationTimeout;
-    private Timer propagationTimer;
-    private volatile boolean running = true;
+    private final ScheduledExecutorService scheduler;
+    private boolean running = true;
     private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
 
     public RoutingInformationProtocolNode(
@@ -42,45 +42,56 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
         this.distanceTable = initializeDistanceTable();
 
         unicastThreadInitialization();
+        scheduler = Executors.newScheduledThreadPool(1);
     }
 
     @Override
-    public void upDataInd(short source, String message) {
-        String[] brokenPDU = message.split(" ");
+    public void upDataInd(short source, String unicastMessage) {
+        String[] brokenUnicastPDU = unicastMessage.split(" ", 3);
+        String[] brokenMessagePDU = brokenUnicastPDU[2].split(" ");
 
-        switch (brokenPDU[2]) {
+        switch (brokenMessagePDU[0]) {
             case "RIPRQT":
                 handleDistanceTableRequest(source);
                 break;
 
             case "RIPGET":
-                int getNodeAId = Integer.parseInt(brokenPDU[3]);
-                int getNodeBId = Integer.parseInt(brokenPDU[4]);
+                int getNodeAId = Integer.parseInt(brokenMessagePDU[1]);
+                int getNodeBId = Integer.parseInt(brokenMessagePDU[2]);
 
                 handleGetLinkCost(source, getNodeAId, getNodeBId);
                 break;
 
             case "RIPSET":
-                int setNodeAId = Integer.parseInt(brokenPDU[3]);
-                int setNodeBId = Integer.parseInt(brokenPDU[4]);
-                int newCost = Integer.parseInt(brokenPDU[5]);
+                int setNodeAId = Integer.parseInt(brokenMessagePDU[1]);
+                int setNodeBId = Integer.parseInt(brokenMessagePDU[2]);
+                int newCost = Integer.parseInt(brokenMessagePDU[3]);
 
                 handleSetLinkCost(source, setNodeAId, setNodeBId, newCost);
                 break;
 
             case "RIPIND":
-                short neighborId = Short.parseShort(brokenPDU[3]);
-                String neighborDistanceVector = brokenPDU[4];
+                short neighborId = Short.parseShort(brokenMessagePDU[1]);
+                String neighborDistanceVector = brokenMessagePDU[4];
 
                 handleDistanceVector(neighborId, neighborDistanceVector);
                 break;
         }
     }
 
+    public void startNode(){
+        scheduler.scheduleAtFixedRate(() -> {
+            if(running){
+                propagateDistanceVector();
+            }
+        }, propagationTimeout, propagationTimeout, TimeUnit.SECONDS);
+    }
+
+    /*
     @Override
     public void run() {
 
-    }
+    }*/
 
     private int[][] initializeDistanceTable() {
         int numRows = neighbors.size() + 1;
@@ -145,6 +156,8 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
 
     private void handleSetLinkCost(short source, int nodeAId, int nodeBId, int cost) {
         boolean changed;
+        String responseMessage;
+
         rwLock.writeLock().lock();
         try {
             short neighborId = (short) nodeBId;
@@ -155,9 +168,7 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
             distanceTable[0][neighborIndex] = cost;
 
             changed = recalculateDistanceVector();
-
-            String responseMessage = createLinkCostPDU((short) nodeAId, (short) nodeBId);
-            getUnicastProtocol().upDataReq(source, responseMessage);
+            responseMessage = createLinkCostPDU((short) nodeAId, (short) nodeBId);
         } finally {
             rwLock.writeLock().unlock();
         }
@@ -165,6 +176,8 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
         if (changed) {
             propagateDistanceVector();
         }
+
+        getUnicastProtocol().upDataReq(source, responseMessage);
     }
 
     private void handleDistanceVector(short neighborId, String neighborDistanceVectorStr){
@@ -237,7 +250,7 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
     }
 
     private String createDistanceTableResponsePDU() {
-        String responseMessage = "RIPRSQ" + nodeId;
+        String responseMessage = "RIPRSP" + nodeId;
         StringBuilder formatDistanceTable = new StringBuilder();
 
         for (int i = 0; i < distanceTable.length; i++) {
@@ -274,5 +287,20 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
         }
 
         return "RIPIND " + nodeId + " " + propagateMessage;
+    }
+
+    public void stop(){
+        running = false;
+
+        scheduler.shutdown();
+        try{
+            if(!scheduler.awaitTermination(5, TimeUnit.SECONDS)){
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+        getUnicastProtocol().stopRunning();
     }
 }

@@ -122,7 +122,7 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
         return -1;
     }
 
-    private void stopRunning(){
+    public void stopRunning(){
         datagramSocket.close();
         onNodeRunning = false;
     }
