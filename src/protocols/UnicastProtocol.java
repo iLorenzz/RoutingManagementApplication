@@ -1,72 +1,129 @@
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
+import java.net.*;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.stream.Stream;
 
-public class UnicastProtocol implements UnicastServiceInterface{
-    private static ConcurrentMap<Short, String[]> entity_map = new ConcurrentHashMap<>();
+import static java.lang.System.exit;
+
+public class UnicastProtocol implements UnicastServiceInterface, Runnable{
+    private static final ConcurrentMap<Short, String[]> entityMap = new ConcurrentHashMap<>();
+
+    private final short ucsapId;
+    private final String hostName;
+    private final int portNumber;
+    private volatile boolean onNodeRunning = true;
+
+    private final DatagramSocket datagramSocket;
 
     private final RoutingInformationProtocol routingInformationProtocol;
 
-    public UnicastProtocol(){
-        routingInformationProtocol = new RoutingInformationProtocol();
+    public UnicastProtocol(short ucsapId, String hostname, int portNumber, RoutingInformationProtocol routingInformationProtocol){
+        this.ucsapId = ucsapId;
+        this.hostName = hostname;
+        if (portNumber <= 1024 || portNumber > 65535) {
+            throw new IllegalArgumentException("Invalid port number " + portNumber + " at id " + ucsapId);
+        }
+        this.portNumber = portNumber;
+        this.routingInformationProtocol = routingInformationProtocol;
+
+        try {
+            InetAddress address = InetAddress.getByName(hostname);
+
+            String[] entityInformation = {
+                address.toString(),
+                Integer.toString(portNumber),
+            };
+
+            setEntityMap(ucsapId, entityInformation);
+
+            this.datagramSocket = new DatagramSocket(portNumber, address);
+
+        } catch (UnknownHostException | SocketException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public static void setEntity_map(Short id, String[] entity_information) {
-        entity_map.put(id, entity_information);
-        System.out.println(Arrays.toString(entity_map.get(id)));
+    public static void setEntityMap(Short id, String[] entityInformation) {
+        entityMap.put(id, entityInformation);
     }
 
     @Override
-    public boolean up_data_req(short destination, String message) throws UnknownHostException {
-        try(DatagramSocket datagram = new DatagramSocket()){
-
-            byte[] buffer = create_message(message);
+    public boolean upDataReq(short destination, String message) {
+        try{
+            byte[] buffer = createMessage(message);
 
             if(buffer.length > 1024){
                 return false;
             }
 
-            InetAddress address = InetAddress.getByName(entity_map.get(destination)[0]);
-            DatagramPacket requestPacket = new DatagramPacket(buffer, buffer.length, address, Integer.parseInt(entity_map.get(destination)[1]));
+            String[] destinationInfo = entityMap.get(destination);
+            if(destinationInfo == null){
+                return false;
+            }
 
-            datagram.send(requestPacket);
+            InetAddress address = InetAddress.getByName(destinationInfo[0]);
+            DatagramPacket requestPacket = new DatagramPacket(buffer, buffer.length, address, Integer.parseInt(destinationInfo[1]));
+
+            datagramSocket.send(requestPacket);
 
             return true;
 
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+        } catch (IOException ioe) {
+            return false;
         }
     }
 
-    private byte[] create_message(String message){
-        int message_size = message.length();
-        String format_message = "UPDREQPDU" + " " + message_size + " " + message;
+    @Override
+    public void run(){
+        while(onNodeRunning){
+            try{
+                byte[] buffer = new byte[1024];
 
-        return format_message.getBytes();
+                DatagramPacket requestPack = new DatagramPacket(buffer, buffer.length);
+                datagramSocket.receive(requestPack);
+
+                String message = new String(requestPack.getData());
+                InetAddress sourceAddress = requestPack.getAddress();
+                int sourcePort = requestPack.getPort();
+
+                String[] sourceEntityInformation = {
+                        sourceAddress.toString(),
+                        Integer.toString(sourcePort)
+                };
+
+                short senderUcsapId = getSenderUcsapId(sourceEntityInformation);
+
+                routingInformationProtocol.upDataInd(senderUcsapId, message);
+            } catch (Exception e) {
+                stopRunning();
+                exit(-1);
+            }
+        }
     }
 
-    /*
-    public void receiveMessage(int port){
-        try(DatagramSocket datagram = new DatagramSocket(port)){
-            byte[] buffer = new byte[1024];
+    private byte[] createMessage(String message){
+        String trimmedString = message.trim();
 
-            DatagramPacket requestPack = new DatagramPacket(buffer, buffer.length);
-            datagram.receive(requestPack);
+        int messageSize = trimmedString.length();
+        String formatMessage = "UPDREQPDU" + " " + messageSize + " " + trimmedString;
 
-            short source = UnicastEntity.getLastSender();
+        return formatMessage.getBytes();
+    }
 
-            String message = new String(requestPack.getData());
-
-            routingInformationProtocol.upDataInd(source, message);
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
+    private short getSenderUcsapId(String[] sourceEntityInformation){
+        for(Map.Entry<Short, String[]> entry : entityMap.entrySet()){
+            if(Arrays.equals(entry.getValue(), sourceEntityInformation)) {
+                return entry.getKey();
+            }
         }
-    }*/
+
+        return -1;
+    }
+
+    private void stopRunning(){
+        datagramSocket.close();
+        onNodeRunning = false;
+    }
 }

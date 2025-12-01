@@ -1,4 +1,4 @@
-import java.net.UnknownHostException;
+/*import java.net.UnknownHostException;
 
 public class UnicastEntity implements Runnable {
 
@@ -61,4 +61,4 @@ public class UnicastEntity implements Runnable {
 	public static short getLastSender() {
 		return lastEntitySender;
 	}
-}
+}*/
