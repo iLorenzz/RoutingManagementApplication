@@ -4,8 +4,8 @@ import java.util.SortedSet;
 public class RoutingManagementApplication implements RoutingProtocolManagementServiceUserInterface, Runnable{
     private RoutingInformationProtocolManagement routingInformationProtocolManagement;
 
-    public RoutingManagementApplication(String hostname, int portNumber){
-        this.routingInformationProtocolManagement = new RoutingInformationProtocolManagement(hostname, portNumber, this);
+    public RoutingManagementApplication(String hostname, int portNumber, int timeout){
+        this.routingInformationProtocolManagement = new RoutingInformationProtocolManagement(hostname, portNumber, timeout,this);
     }
 
     @Override

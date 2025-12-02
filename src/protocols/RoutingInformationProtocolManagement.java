@@ -3,10 +3,12 @@ import java.util.*;
 public class RoutingInformationProtocolManagement extends RoutingInformationProtocol implements UnicastServiceUserInterface, RoutingProtocolManagementInterface, Runnable{
     private final RoutingManagementApplication routingManagementApplication;
     private final Map<Short, List<Short>> nodesNeighbors;
+    private final int timeout;
 
-    public RoutingInformationProtocolManagement(String hostname, int portNumber, RoutingManagementApplication routingManagementApplication) {
+    public RoutingInformationProtocolManagement(String hostname, int portNumber, int timeout, RoutingManagementApplication routingManagementApplication) {
         super((short) 0, hostname, portNumber);
 
+        this.timeout = timeout;
         this.routingManagementApplication = routingManagementApplication;
         this.nodesNeighbors = new HashMap<>();
     }
@@ -27,7 +29,18 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
                 }
 
                 int[][] distanceTable = generateDistanceTableFromMessage(String.valueOf(distanceTableStr));
-                routingManagementApplication.distanceTableIndication(source, distanceTable);
+                routingManagementApplication.distanceTableIndication(nodeId, distanceTable);
+
+            case "RIPNFT":
+                short nodeAId = Short.parseShort(brokenMessagePDU[1]);
+                short nodeBId = Short.parseShort(brokenMessagePDU[2]);
+                int cost = Integer.parseInt(brokenMessagePDU[3]);
+
+                if(source == nodeAId){
+                    setLinkCost(nodeBId, nodeAId, )
+                }
+
+                routingManagementApplication.linkCostIndication(nodeAId, nodeBId, cost);
         }
     }
 
