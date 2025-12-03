@@ -2,9 +2,9 @@ public abstract class RoutingInformationProtocol implements UnicastServiceUserIn
     private final UnicastProtocol unicastProtocol;
     private final short id;
 
-    public RoutingInformationProtocol(short id, String hostName, int portNumber){
+    public RoutingInformationProtocol(short id, String hostName, int portNumber, String unicastConfigFilePath){
         this.id = id;
-        this.unicastProtocol = new UnicastProtocol(this.id, hostName, portNumber, this);
+        this.unicastProtocol = new UnicastProtocol(this.id, hostName, portNumber, unicastConfigFilePath,this);
     }
 
     @Override

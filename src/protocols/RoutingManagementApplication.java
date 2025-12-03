@@ -7,8 +7,8 @@ import java.util.SortedSet;
 public class RoutingManagementApplication implements RoutingProtocolManagementServiceUserInterface{
     private final RoutingInformationProtocolManagement routingInformationProtocolManagement;
 
-    public RoutingManagementApplication(String hostname, int portNumber, int timeout){
-        this.routingInformationProtocolManagement = new RoutingInformationProtocolManagement(hostname, portNumber, timeout,this);
+    public RoutingManagementApplication(String hostname, int portNumber, int timeout, String unicastConfigFilePath){
+        this.routingInformationProtocolManagement = new RoutingInformationProtocolManagement(hostname, portNumber, unicastConfigFilePath, timeout, this);
     }
 
     @Override
@@ -41,6 +41,21 @@ public class RoutingManagementApplication implements RoutingProtocolManagementSe
         return routingInformationProtocolManagement;
     }
 
+    private void addNodeNeighborsMap(String topologyConfigurationPath) throws FileNotFoundException {
+        Scanner topologyConfigurationScanner = new Scanner(new File(topologyConfigurationPath));
+
+        while(topologyConfigurationScanner.hasNextLine()){
+            String topologyIConfig = topologyConfigurationScanner.nextLine();
+            String[] splitTopologyConfig = topologyIConfig.split(" ");
+
+            short nodeAId = Short.parseShort(splitTopologyConfig[0]);
+            short nodeBId = Short.parseShort(splitTopologyConfig[1]);
+
+            this.routingInformationProtocolManagement.addNodeNeighbor(nodeAId, nodeBId);
+            this.routingInformationProtocolManagement.addNodeNeighbor(nodeBId, nodeAId);
+        }
+    }
+
     public static void main(String[] args){
         String topologyConfigurationPath = "src/protocols/topology_configuration.txt";
         String unicastConfigurationPath = "src/protocols/unicast_configuration.txt";
@@ -51,16 +66,76 @@ public class RoutingManagementApplication implements RoutingProtocolManagementSe
 
         try {
             RoutingManagementApplication routingManagementApplication = newRoutingManagementApplication(unicastConfigurationPath);
+            routingManagementApplication.addNodeNeighborsMap(topologyConfigurationPath);
+
             while(running){
                 System.out.println("""
-                        ----------------- Chose an operation -----------------
-                        -> getLinkCost: to get a link between two nodes
-                        ->  
-                        """);
+                       -------------------------------------------------------
+                        Choose an operation:
+                       -------------------------------------------------------
+                        -> getLinkCost: to get a cost link between two nodes
+                        -> setLinkCost: to set a cost link between two nodes
+                        -> getDistanceTable: to get a node distance table
+                        -> exit: to close management
+                       """);
+                System.out.println();
 
                 operation = sc.nextLine();
+
                 switch(operation){
 
+                    case "getLinkCost":
+                        System.out.println("Choose two nodes: ");
+                        short getLinkNodeAId = Short.parseShort(sc.nextLine());
+                        short getLinkNodeBId = Short.parseShort(sc.nextLine());
+
+                        if(!routingManagementApplication
+                                .getRoutingInformationProtocolManagement()
+                                .getLinkCost(getLinkNodeAId, getLinkNodeBId)){
+
+                            System.err.println(getLinkNodeAId + " and " + getLinkNodeBId + " " + "are not neighbors or node was not found!");
+                            System.out.println("Select nodes that are neighbors!");
+                        }
+
+                        break;
+
+                    case "setLinkCost":
+                        System.out.println("Choose two nodes: ");
+                        short setLinkNodeAId = Short.parseShort(sc.nextLine());
+                        short setLinkNodeBId = Short.parseShort(sc.nextLine());
+
+                        System.out.println("Enter new cost value");
+                        int cost = Integer.parseInt(sc.nextLine());
+
+                        if(!routingManagementApplication
+                                .getRoutingInformationProtocolManagement()
+                                .setLinkCost(setLinkNodeAId, setLinkNodeBId, cost)){
+
+                            System.err.println(setLinkNodeAId + " and " + setLinkNodeBId + " " + "are not neighbors or node was not found!");
+                            System.out.println("Select nodes that are neighbors!");
+                        }
+
+                        break;
+
+                    case "getDistanceTable":
+                        System.out.println("Choose a node: ");
+                        short nodeId = Short.parseShort(sc.nextLine());
+
+                        if(!routingManagementApplication
+                                .getRoutingInformationProtocolManagement()
+                                .getDistanceTable(nodeId)){
+
+                            System.out.println("Node was not found!");
+                        }
+                        break;
+
+                    case "exit":
+                        System.out.println("Finishing...");
+                        running = false;
+                        break;
+
+                    default:
+                        System.err.println("No such operation " + operation + "!");
                 }
             }
         }catch (FileNotFoundException fnfe){
@@ -77,8 +152,7 @@ public class RoutingManagementApplication implements RoutingProtocolManagementSe
        String hostname = splitManagementInfo[1];
        int portNumber = Integer.parseInt(splitManagementInfo[2]);
 
-       return new RoutingManagementApplication(hostname, portNumber, 10);
+       return new RoutingManagementApplication(hostname, portNumber, 10, unicastConfigurationPath);
    }
 
-   //private static void add
 }

@@ -63,6 +63,7 @@ public class StartNode {
                                 nodeId,
                                 hostname,
                                 portNumber,
+                                unicastConfigurationPath,
                                 propagationTimeout,
                                 nodeNeighborsLinkCost,
                                 allNodesId
@@ -84,14 +85,18 @@ public class StartNode {
             String topologyConfig = topologyScanner.nextLine();
             String[] splitTopologyConfig = topologyConfig.split(" ");
 
-            short nodeA = Short.parseShort(splitTopologyConfig[0]);
-            short nodeB = Short.parseShort(splitTopologyConfig[1]);
+            short nodeAId = Short.parseShort(splitTopologyConfig[0]);
+            short nodeBId = Short.parseShort(splitTopologyConfig[1]);
             int cost = Integer.parseInt(splitTopologyConfig[2]);
 
-            if (nodeA == nodeId) {
-                nodeNeighborsLinkCost.put(nodeB, cost);
-            } else if (nodeB == nodeId) {
-                nodeNeighborsLinkCost.put(nodeA, cost);
+            if (cost < 1 || cost > 15){
+                throw new IllegalLinkCostValue("All link costs must be between 1 - 15!");
+            }
+
+            if (nodeAId == nodeId) {
+                nodeNeighborsLinkCost.put(nodeBId, cost);
+            } else if (nodeBId == nodeId) {
+                nodeNeighborsLinkCost.put(nodeAId, cost);
             }
         }
 

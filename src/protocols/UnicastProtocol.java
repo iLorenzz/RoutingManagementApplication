@@ -1,14 +1,16 @@
+import java.io.File;
 import java.io.IOException;
 import java.net.*;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import static java.lang.System.exit;
 
 public class UnicastProtocol implements UnicastServiceInterface, Runnable{
-    private static final ConcurrentMap<Short, String[]> entityMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Short, String[]> entityMap = new ConcurrentHashMap<>();
 
     private final short ucsapId;
     private final String hostName;
@@ -19,7 +21,7 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
 
     private final RoutingInformationProtocol routingInformationProtocol;
 
-    public UnicastProtocol(short ucsapId, String hostname, int portNumber, RoutingInformationProtocol routingInformationProtocol){
+    public UnicastProtocol(short ucsapId, String hostname, int portNumber, String unicastConfigFilePath, RoutingInformationProtocol routingInformationProtocol){
         this.ucsapId = ucsapId;
         this.hostName = hostname;
         if (portNumber <= 1024 || portNumber > 65535) {
@@ -28,32 +30,24 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
         this.portNumber = portNumber;
         this.routingInformationProtocol = routingInformationProtocol;
 
+        readUnicastConfigFile(unicastConfigFilePath);
+
+        //System.out.println(Arrays.toString(entityMap.get((short) 2)));
+
         try {
             InetAddress address = InetAddress.getByName(hostname);
 
-            String[] entityInformation = {
-                address.getHostAddress(),
-                Integer.toString(portNumber),
-            };
-
-            setEntityMap(ucsapId, entityInformation);
+            //System.out.println(Arrays.toString(entityMap.get((short)0)));
 
             this.datagramSocket = new DatagramSocket(portNumber, address);
-            System.out.println("socket open");
 
         } catch (UnknownHostException | SocketException e) {
             throw new RuntimeException(e.getMessage());
         }
     }
 
-    public static void setEntityMap(Short id, String[] entityInformation) {
-        entityMap.put(id, entityInformation);
-    }
-
     @Override
     public boolean upDataReq(short destination, String message) {
-        System.out.println("tentando enviar algo");
-
         try{
             byte[] buffer = createMessage(message);
 
@@ -88,8 +82,6 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
                 DatagramPacket requestPack = new DatagramPacket(buffer, buffer.length);
                 datagramSocket.receive(requestPack);
 
-                System.out.println("recebeu o pacote");
-
                 String message = new String(requestPack.getData());
                 InetAddress sourceAddress = requestPack.getAddress();
                 int sourcePort = requestPack.getPort();
@@ -99,10 +91,11 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
                         Integer.toString(sourcePort)
                 };
 
-                System.out.println(Arrays.toString(sourceEntityInformation));
+                //System.out.println(Arrays.toString(sourceEntityInformation));
 
                 short senderUcsapId = getSenderUcsapId(sourceEntityInformation);
                 routingInformationProtocol.upDataInd(senderUcsapId, message);
+
             } catch (Exception e) {
                 System.err.println("Unicast thread error, ending program");
                 System.exit(-1);
@@ -121,6 +114,33 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
         return formatMessage.getBytes();
     }
 
+    private void readUnicastConfigFile(String configFilePath) {
+        try (Scanner scanner = new Scanner(new File(configFilePath))) {
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine();
+                if (line.isEmpty()) continue;
+
+                String[] parts = line.split(" ");
+                if (parts.length != 3) {
+                    throw new IllegalArgumentException("Invalid line: " + line);
+                }
+
+                short id = Short.parseShort(parts[0]);
+                String host = parts[1];
+                int port = Integer.parseInt(parts[2]);
+
+                InetAddress address = InetAddress.getByName(host);
+                String[] entityInfo = {
+                        address.getHostAddress(),
+                        Integer.toString(port)
+                };
+                entityMap.put(id, entityInfo);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to read config file: " + configFilePath, e);
+        }
+    }
+
     private short getSenderUcsapId(String[] sourceEntityInformation){
         for(Map.Entry<Short, String[]> entry : entityMap.entrySet()){
             String[] entityInfo = entry.getValue();
@@ -134,7 +154,6 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
             }
         }
 
-        System.out.println("estive aqui");
         return -1;
     }
 

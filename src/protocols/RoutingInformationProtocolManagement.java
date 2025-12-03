@@ -13,13 +13,13 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
     private final int timeout;
     private final ScheduledExecutorService retryScheduler;
 
-    public RoutingInformationProtocolManagement(String hostname, int portNumber, int timeout, RoutingManagementApplication routingManagementApplication) {
-        super((short) 0, hostname, portNumber);
+    public RoutingInformationProtocolManagement(String hostname, int portNumber, String unicastConfigFilePath, int timeout, RoutingManagementApplication routingManagementApplication) {
+        super((short) 0, hostname, portNumber, unicastConfigFilePath);
 
         this.timeout = timeout;
         this.routingManagementApplication = routingManagementApplication;
         this.nodesNeighbors = new HashMap<>();
-        this.retryScheduler = Executors.newScheduledThreadPool(1);
+        this.retryScheduler = Executors.newScheduledThreadPool(4);
 
         unicastThreadInitialization();
     }
@@ -36,7 +36,7 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
 
         switch(brokenMessagePDU[0]){
             case "RIPRSP":
-
+                System.out.println("hello");
                 short nodeId = Short.parseShort(brokenMessagePDU[1]);
 
                 StringBuilder distanceTableStr = new StringBuilder();
@@ -49,7 +49,7 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
                 routingManagementApplication.distanceTableIndication(nodeId, distanceTable);
                 break;
 
-            case "RIPNFT":
+            case "RIPNTF":
                 short nodeAId = Short.parseShort(brokenMessagePDU[1]);
                 short nodeBId = Short.parseShort(brokenMessagePDU[2]);
                 int cost = Integer.parseInt(brokenMessagePDU[3]);
@@ -70,6 +70,7 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
 
     @Override
     public boolean getDistanceTable(short nodeId){
+        System.out.println("entrou aqui");
         boolean success = getDistanceTableSendMessage(nodeId);
 
         if(success){
@@ -90,7 +91,7 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
         requestLinkState = "LinkCostGetRequest";
         boolean success = getLinkSendMessage(nodeAId, nodeBId);
 
-        if(!success){
+        if(success){
             waitingMessage = true;
             getLinkRequestRetryScheduler(nodeAId, nodeBId);
         }
@@ -105,7 +106,7 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
         }
 
         requestLinkState = "LinkCostSetRequest1";
-        boolean success = setLinkSendMessage(nodeAId, nodeAId, cost);
+        boolean success = setLinkSendMessage(nodeAId, nodeBId, cost);
 
         if(!success){
             waitingMessage = true;
@@ -149,14 +150,7 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
     }
 
     private void stopRetryScheduler(){
-        retryScheduler.shutdown();
-        try{
-            if(!retryScheduler.awaitTermination(1, TimeUnit.SECONDS)){
-                retryScheduler.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            throw new RuntimeException("Timer was forced to interrupt!");
-        }
+        retryScheduler.close();
     }
 
     private void unicastThreadInitialization() {
@@ -169,13 +163,22 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
     }
 
     public void addNodeNeighbor(short nodeAId, short nodeBId){
-        List<Short> nodeNeighbors = new ArrayList<>();
+        if(nodesNeighbors.get(nodeAId) == null){
+            List<Short> neighbors = new ArrayList<>();
+            neighbors.add(nodeBId);
 
-        nodesNeighbors.putIfAbsent(nodeAId, nodeNeighbors);
+            nodesNeighbors.put(nodeAId, neighbors);
+            return;
+        }
 
-        nodeNeighbors.add(nodeBId);
-        nodesNeighbors.put(nodeAId, nodeNeighbors);
+        List<Short> neighbors = nodesNeighbors.get(nodeAId);
+
+        neighbors.add(nodeBId);
+        nodesNeighbors.put(nodeAId, neighbors);
+
+        System.out.println(nodesNeighbors);
     }
+
 
     private int[][] generateDistanceTableFromMessage(String distanceTableStr){
         int[][] distanceTable;
