@@ -1,11 +1,13 @@
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 public class RoutingInformationProtocolManagement extends RoutingInformationProtocol implements UnicastServiceUserInterface, RoutingProtocolManagementInterface{
     private final RoutingManagementApplication routingManagementApplication;
     private final Map<Short, List<Short>> nodesNeighbors;
+    private ScheduledFuture<?> currentRetryTask;
 
     private String requestLinkState;
     private boolean waitingMessage = false;
@@ -19,29 +21,28 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
         this.timeout = timeout;
         this.routingManagementApplication = routingManagementApplication;
         this.nodesNeighbors = new HashMap<>();
-        this.retryScheduler = Executors.newScheduledThreadPool(4);
 
+        this.retryScheduler = Executors.newScheduledThreadPool(4);
         unicastThreadInitialization();
     }
 
     @Override
     public void upDataInd(short source, String unicastMessage){
         if(waitingMessage){
-            stopRetryScheduler();
+            stopRetrySchedulerForRequest();
             waitingMessage = false;
         }
 
         String[] brokenUnicastPDU = unicastMessage.split(" ", 3);
         String[] brokenMessagePDU = brokenUnicastPDU[2].split(" ");
 
-        switch(brokenMessagePDU[0]){
+        switch(brokenMessagePDU[0].trim()){
             case "RIPRSP":
-                System.out.println("hello");
-                short nodeId = Short.parseShort(brokenMessagePDU[1]);
+                short nodeId = Short.parseShort(brokenMessagePDU[1].trim());
 
                 StringBuilder distanceTableStr = new StringBuilder();
                 for(int i = 2; i < brokenMessagePDU.length; i++){
-                    distanceTableStr.append(brokenMessagePDU[i]);
+                    distanceTableStr.append(brokenMessagePDU[i].trim());
                     distanceTableStr.append(" ");
                 }
 
@@ -50,9 +51,9 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
                 break;
 
             case "RIPNTF":
-                short nodeAId = Short.parseShort(brokenMessagePDU[1]);
-                short nodeBId = Short.parseShort(brokenMessagePDU[2]);
-                int cost = Integer.parseInt(brokenMessagePDU[3]);
+                short nodeAId = Short.parseShort(brokenMessagePDU[1].trim());
+                short nodeBId = Short.parseShort(brokenMessagePDU[2].trim());
+                int cost = Integer.parseInt(brokenMessagePDU[3].trim());
 
                 if(requestLinkState.equals("LinkCostSetRequest1")){
                     requestLinkState = "LinkCostSetRequest2";
@@ -94,9 +95,10 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
         if(success){
             waitingMessage = true;
             getLinkRequestRetryScheduler(nodeAId, nodeBId);
+            return true;
         }
 
-        return success;
+        return false;
     }
 
     @Override
@@ -108,12 +110,13 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
         requestLinkState = "LinkCostSetRequest1";
         boolean success = setLinkSendMessage(nodeAId, nodeBId, cost);
 
-        if(!success){
+        if(success){
             waitingMessage = true;
             setLinkRequest1RetryScheduler(nodeAId, nodeBId, cost);
+            return true;
         }
 
-        return success;
+        return false;
     }
 
     private boolean getDistanceTableSendMessage(short nodeId){
@@ -134,23 +137,26 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
     }
 
     private void setLinkRequest1RetryScheduler(short nodeAId, short nodeBId, int cost){
-        retryScheduler.scheduleAtFixedRate(() -> setLinkSendMessage(nodeAId, nodeBId, cost), timeout, timeout, TimeUnit.SECONDS);
+        currentRetryTask = retryScheduler.scheduleAtFixedRate(() -> setLinkSendMessage(nodeAId, nodeBId, cost), timeout, timeout, TimeUnit.SECONDS);
     }
 
     private void setLinkRequest2RetryScheduler(short nodeBId, short nodeAId, int cost){
-        retryScheduler.scheduleAtFixedRate(() -> setLinkSendMessage(nodeBId, nodeAId, cost), timeout, timeout, TimeUnit.SECONDS);
+        currentRetryTask = retryScheduler.scheduleAtFixedRate(() -> setLinkSendMessage(nodeBId, nodeAId, cost), timeout, timeout, TimeUnit.SECONDS);
     }
 
     private void getLinkRequestRetryScheduler(short nodeAId, short nodeBId){
-        retryScheduler.scheduleAtFixedRate(() -> getLinkSendMessage(nodeAId, nodeBId), timeout, timeout, TimeUnit.SECONDS);
+        currentRetryTask = retryScheduler.scheduleAtFixedRate(() -> getLinkSendMessage(nodeAId, nodeBId), timeout, timeout, TimeUnit.SECONDS);
     }
 
     private void getTableRequestRetryScheduler(short nodeId){
-        retryScheduler.scheduleAtFixedRate(() -> getDistanceTableSendMessage(nodeId), timeout, timeout, TimeUnit.SECONDS);
+        currentRetryTask = retryScheduler.scheduleAtFixedRate(() -> getDistanceTableSendMessage(nodeId), timeout, timeout, TimeUnit.SECONDS);
     }
 
-    private void stopRetryScheduler(){
-        retryScheduler.close();
+    private void stopRetrySchedulerForRequest() {
+        if (currentRetryTask != null && !currentRetryTask.isCancelled()) {
+            currentRetryTask.cancel(false);
+            currentRetryTask = null;
+        }
     }
 
     private void unicastThreadInitialization() {
@@ -200,7 +206,6 @@ public class RoutingInformationProtocolManagement extends RoutingInformationProt
                 distanceTable[i][j] = Integer.parseInt(neighborDistanceVector[j]);
             }
         }
-
         return distanceTable;
     }
 }

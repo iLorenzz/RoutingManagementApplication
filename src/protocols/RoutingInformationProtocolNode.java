@@ -53,31 +53,28 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
         String[] ripMessage = brokenUnicastPDU[2].split(" ");
 
         System.out.println(ripMessage[0]);
-
         switch (ripMessage[0].trim()) {
             case "RIPRQT":
-                System.out.println("get message");
                 handleDistanceTableRequest(source);
                 break;
 
             case "RIPGET":
-                int getNodeAId = Integer.parseInt(ripMessage[1]);
-                int getNodeBId = Integer.parseInt(ripMessage[2]);
-
+                short getNodeAId = Short.parseShort(ripMessage[1].trim());
+                short getNodeBId = Short.parseShort(ripMessage[2].trim());
                 handleGetLinkCost(source, getNodeAId, getNodeBId);
                 break;
 
             case "RIPSET":
-                int setNodeAId = Integer.parseInt(ripMessage[1]);
-                int setNodeBId = Integer.parseInt(ripMessage[2]);
-                int newCost = Integer.parseInt(ripMessage[3]);
+                short setNodeAId = Short.parseShort(ripMessage[1].trim());
+                short setNodeBId = Short.parseShort(ripMessage[2].trim());
+                int newCost = Integer.parseInt(ripMessage[3].trim());
 
                 handleSetLinkCost(source, setNodeAId, setNodeBId, newCost);
                 break;
 
             case "RIPIND":
-                short neighborId = Short.parseShort(ripMessage[1]);
-                String neighborDistanceVector = ripMessage[2];
+                short neighborId = Short.parseShort(ripMessage[1].trim());
+                String neighborDistanceVector = ripMessage[2].trim();
 
                 //System.out.println(neighborDistanceVector);
 
@@ -131,14 +128,15 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
     }
 
     private void unicastThreadInitialization() {
-        Thread thrd = new Thread(getUnicastProtocol());
-        thrd.start();
+        Thread unicastThread = new Thread(getUnicastProtocol());
+        unicastThread.start();
     }
 
     private void handleDistanceTableRequest(short source){
         rwLock.readLock().lock();
         try {
             String responseMessage = createDistanceTableResponsePDU();
+            System.out.println(responseMessage);
             getUnicastProtocol().upDataReq(source, responseMessage);
         } finally {
             rwLock.readLock().unlock();
@@ -146,10 +144,10 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
 
     }
 
-    private void handleGetLinkCost(short source, int nodeAId, int nodeBId) {
+    private void handleGetLinkCost(short source, short nodeAId, short nodeBId) {
         rwLock.readLock().lock();
         try {
-            String responseMessage = createLinkCostPDU((short) nodeAId, (short) nodeBId);
+            String responseMessage = createLinkCostPDU(nodeAId, nodeBId);
             getUnicastProtocol().upDataReq(source, responseMessage);
         } finally {
             rwLock.readLock().unlock();
@@ -157,21 +155,18 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
 
     }
 
-    private void handleSetLinkCost(short source, int nodeAId, int nodeBId, int cost) {
+    private void handleSetLinkCost(short source, short nodeAId, short nodeBId, int cost) {
         boolean changed;
         String responseMessage;
-
         rwLock.writeLock().lock();
         try {
-            short neighborId = (short) nodeBId;
+            linkCosts.put(nodeBId, cost);
 
-            linkCosts.put(neighborId, cost);
-
-            int neighborIndex = allNodes.indexOf(neighborId);
+            int neighborIndex = allNodes.indexOf(nodeBId);
             distanceTable[0][neighborIndex] = cost;
 
             changed = recalculateDistanceVector();
-            responseMessage = createLinkCostPDU((short) nodeAId, (short) nodeBId);
+            responseMessage = createLinkCostPDU(nodeAId, nodeBId);
         } finally {
             rwLock.writeLock().unlock();
         }
@@ -188,7 +183,7 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
 
         try{
             int neighborRow = neighbors.indexOf(neighborId) + 1;
-            String[] costsStr = neighborDistanceVectorStr.split(":");
+            String[] costsStr = neighborDistanceVectorStr.trim().split(":");
 
             for(int i = 0; i < costsStr.length; i++){
                 try {
@@ -207,20 +202,29 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
 
     private boolean recalculateDistanceVector() {
         boolean changed = false;
-        int minCost = -1;
 
         for (int i = 0; i < allNodes.size(); i++) {
             short node = allNodes.get(i);
 
             if (node == nodeId) {
+                if (distanceTable[0][i] != 0) {
+                    distanceTable[0][i] = 0;
+                    changed = true;
+                }
                 continue;
             }
 
-            for (Short neighbor : neighbors) {
-                Integer directLinkCost = linkCosts.get(neighbor);
+            int minCost = -1;
 
-                int neighborRow = neighbors.indexOf(neighbor) + 1;
+            for (Short neighborId : neighbors) {
+                Integer directLinkCost = linkCosts.get(neighborId);
+                if(directLinkCost == -1){
+                    continue;
+                }
+
+                int neighborRow = neighbors.indexOf(neighborId) + 1;
                 int fromNeighborToDestinationNode = distanceTable[neighborRow][i];
+
                 if (fromNeighborToDestinationNode == -1) {
                     continue;
                 }
@@ -243,6 +247,10 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
     private void propagateDistanceVector(){
         rwLock.readLock().lock();
         try {
+            if(neighbors.isEmpty()){
+                return;
+            }
+
             String propagateVectorMessage = createDistanceVectorMessage();
             for (Short neighbor : neighbors) {
                 getUnicastProtocol().upDataReq(neighbor, propagateVectorMessage);
@@ -255,6 +263,8 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
     private String createDistanceTableResponsePDU() {
         String responseMessage = "RIPRSP" + " " + nodeId;
         StringBuilder formatDistanceTable = new StringBuilder();
+
+        System.out.println(Arrays.deepToString(distanceTable));
 
         for (int[] distanceVector : distanceTable) {
             for (int j = 0; j < distanceTable[0].length; j++) {
@@ -272,10 +282,10 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
         return responseMessage + " " + formatDistanceTable;
     }
 
-    private String createLinkCostPDU(int nodeAId, int nodeBId) {
-        String responseMessage = "RIPNFT" + " " + nodeAId + " " + nodeBId;
+    private String createLinkCostPDU(short nodeAId, short nodeBId) {
+        String responseMessage = "RIPNTF" + " " + nodeAId + " " + nodeBId;
 
-        return responseMessage + " " + linkCosts.get((short) nodeAId);
+        return responseMessage + " " + linkCosts.get(nodeBId);
     }
 
     private String createDistanceVectorMessage() {
@@ -294,16 +304,7 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
 
     public void stop(){
         running = false;
-
         scheduler.shutdown();
-        try{
-            if(!scheduler.awaitTermination(5, TimeUnit.SECONDS)){
-                scheduler.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            scheduler.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
         getUnicastProtocol().stopRunning();
     }
 }

@@ -1,43 +1,27 @@
 import java.io.File;
-import java.io.IOException;
 import java.net.*;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import static java.lang.System.exit;
-
 public class UnicastProtocol implements UnicastServiceInterface, Runnable{
     private final ConcurrentMap<Short, String[]> entityMap = new ConcurrentHashMap<>();
-
-    private final short ucsapId;
-    private final String hostName;
-    private final int portNumber;
-    private volatile boolean onNodeRunning = true;
 
     private final DatagramSocket datagramSocket;
 
     private final RoutingInformationProtocol routingInformationProtocol;
 
     public UnicastProtocol(short ucsapId, String hostname, int portNumber, String unicastConfigFilePath, RoutingInformationProtocol routingInformationProtocol){
-        this.ucsapId = ucsapId;
-        this.hostName = hostname;
         if (portNumber <= 1024 || portNumber > 65535) {
             throw new IllegalArgumentException("Invalid port number " + portNumber + " at id " + ucsapId);
         }
-        this.portNumber = portNumber;
         this.routingInformationProtocol = routingInformationProtocol;
 
         readUnicastConfigFile(unicastConfigFilePath);
 
-        //System.out.println(Arrays.toString(entityMap.get((short) 2)));
-
         try {
             InetAddress address = InetAddress.getByName(hostname);
-
-            //System.out.println(Arrays.toString(entityMap.get((short)0)));
 
             this.datagramSocket = new DatagramSocket(portNumber, address);
 
@@ -75,6 +59,7 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
 
     @Override
     public void run(){
+        boolean onNodeRunning = true;
         while(onNodeRunning){
             try{
                 byte[] buffer = new byte[1024];
@@ -91,15 +76,15 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
                         Integer.toString(sourcePort)
                 };
 
-                //System.out.println(Arrays.toString(sourceEntityInformation));
-
                 short senderUcsapId = getSenderUcsapId(sourceEntityInformation);
                 routingInformationProtocol.upDataInd(senderUcsapId, message);
 
             } catch (Exception e) {
-                System.err.println("Unicast thread error, ending program");
-                System.exit(-1);
+                System.out.println("Unicast thread finishing, ending program");
+                System.exit(0);
             }
+
+            stopRunning();
         }
     }
 
@@ -108,8 +93,6 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
 
         int messageSize = trimmedString.length();
         String formatMessage = "UPDREQPDU" + " " + messageSize + " " + trimmedString;
-
-        System.out.println(formatMessage);
 
         return formatMessage.getBytes();
     }
@@ -145,11 +128,8 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
         for(Map.Entry<Short, String[]> entry : entityMap.entrySet()){
             String[] entityInfo = entry.getValue();
 
-            //System.out.println(Arrays.toString(entityInfo));
-
             if(entityInfo[0].equals(sourceEntityInformation[0]) &&
                     entityInfo[1].equals(sourceEntityInformation[1])) {
-                System.out.println(entry.getKey());
                 return entry.getKey();
             }
         }
@@ -159,6 +139,5 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
 
     public void stopRunning(){
         datagramSocket.close();
-        onNodeRunning = false;
     }
 }

@@ -14,27 +14,30 @@ public class RoutingManagementApplication implements RoutingProtocolManagementSe
     @Override
     public void distanceTableIndication(short nodeId, int[][] distanceTable){
         System.out.println();
-        System.out.println("-----------------------------------");
-        System.out.println("Node " + nodeId + "Distance Table");
-        System.out.println("-----------------------------------");
+        System.out.println("---------------------------------------");
+        System.out.println("Node " + nodeId + " " + "Distance Table");
+        System.out.println("---------------------------------------");
 
         for(int[] distanceVector : distanceTable){
             for(int j = 0; j < distanceVector.length; j++){
                 if(j == distanceVector.length-1){
                     System.out.println(distanceVector[j]);
+                    break;
                 }
-                System.out.println(distanceVector[j]);
-                System.out.println(" ");
+                System.out.print(distanceVector[j]);
+                System.out.print(" ");
             }
         }
+        System.out.println();
     }
 
     @Override
     public void linkCostIndication(short nodeAId, short nodeBId, int cost){
         System.out.println();
         System.out.println("-----------------------------------------------");
-        System.out.println("Link " + nodeAId + "-" + nodeBId + " " + "cost");
+        System.out.println("Link " + nodeAId + "-" + nodeBId + " " + "cost = " + cost);
         System.out.println("----------------------------------------------=");
+        System.out.println();
     }
 
     public RoutingInformationProtocolManagement getRoutingInformationProtocolManagement() {
@@ -85,7 +88,7 @@ public class RoutingManagementApplication implements RoutingProtocolManagementSe
                 switch(operation){
 
                     case "getLinkCost":
-                        System.out.println("Choose two nodes: ");
+                        System.out.println("Choose two nodes:");
                         short getLinkNodeAId = Short.parseShort(sc.nextLine());
                         short getLinkNodeBId = Short.parseShort(sc.nextLine());
 
@@ -95,23 +98,24 @@ public class RoutingManagementApplication implements RoutingProtocolManagementSe
 
                             System.err.println(getLinkNodeAId + " and " + getLinkNodeBId + " " + "are not neighbors or node was not found!");
                             System.out.println("Select nodes that are neighbors!");
+                            System.out.println();
                         }
 
                         break;
 
                     case "setLinkCost":
-                        System.out.println("Choose two nodes: ");
+                        System.out.println("Choose two nodes:");
                         short setLinkNodeAId = Short.parseShort(sc.nextLine());
                         short setLinkNodeBId = Short.parseShort(sc.nextLine());
 
-                        System.out.println("Enter new cost value");
+                        System.out.println("Enter new cost value:");
                         int cost = Integer.parseInt(sc.nextLine());
 
                         if(!routingManagementApplication
                                 .getRoutingInformationProtocolManagement()
                                 .setLinkCost(setLinkNodeAId, setLinkNodeBId, cost)){
 
-                            System.err.println(setLinkNodeAId + " and " + setLinkNodeBId + " " + "are not neighbors or node was not found!");
+                            System.err.println("Nodes " + setLinkNodeAId + " and " + setLinkNodeBId + " " + "are not neighbors or node was not found!");
                             System.out.println("Select nodes that are neighbors!");
                         }
 
@@ -131,6 +135,11 @@ public class RoutingManagementApplication implements RoutingProtocolManagementSe
 
                     case "exit":
                         System.out.println("Finishing...");
+                        routingManagementApplication
+                                .getRoutingInformationProtocolManagement()
+                                .getUnicastProtocol()
+                                .stopRunning();
+
                         running = false;
                         break;
 
