@@ -3,6 +3,6 @@ import java.util.SortedSet;
 
 public interface RoutingProtocolManagementServiceUserInterface {
 	void distanceTableIndication(short nodeId, int[][] distanceTable);
-	void linkCostIndication(short nodeIdA, short nodeIdB, int cost);
+	void linkCostIndication(short nodeAId, short nodeBId, int cost);
 
 }

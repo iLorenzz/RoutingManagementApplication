@@ -43,55 +43,55 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
 
         unicastThreadInitialization();
         scheduler = Executors.newScheduledThreadPool(1);
+        startNodeVectorPropagation();
     }
 
     @Override
     public void upDataInd(short source, String unicastMessage) {
+        System.out.println("no ind");
         String[] brokenUnicastPDU = unicastMessage.split(" ", 3);
-        String[] brokenMessagePDU = brokenUnicastPDU[2].split(" ");
+        String[] ripMessage = brokenUnicastPDU[2].split(" ");
 
-        switch (brokenMessagePDU[0]) {
+        switch (ripMessage[0]) {
             case "RIPRQT":
                 handleDistanceTableRequest(source);
                 break;
 
             case "RIPGET":
-                int getNodeAId = Integer.parseInt(brokenMessagePDU[1]);
-                int getNodeBId = Integer.parseInt(brokenMessagePDU[2]);
+                int getNodeAId = Integer.parseInt(ripMessage[1]);
+                int getNodeBId = Integer.parseInt(ripMessage[2]);
 
                 handleGetLinkCost(source, getNodeAId, getNodeBId);
                 break;
 
             case "RIPSET":
-                int setNodeAId = Integer.parseInt(brokenMessagePDU[1]);
-                int setNodeBId = Integer.parseInt(brokenMessagePDU[2]);
-                int newCost = Integer.parseInt(brokenMessagePDU[3]);
+                int setNodeAId = Integer.parseInt(ripMessage[1]);
+                int setNodeBId = Integer.parseInt(ripMessage[2]);
+                int newCost = Integer.parseInt(ripMessage[3]);
 
                 handleSetLinkCost(source, setNodeAId, setNodeBId, newCost);
                 break;
 
             case "RIPIND":
-                short neighborId = Short.parseShort(brokenMessagePDU[1]);
-                String neighborDistanceVector = brokenMessagePDU[4];
+                short neighborId = Short.parseShort(ripMessage[1]);
+                String neighborDistanceVector = ripMessage[2];
+
+                System.out.println(neighborDistanceVector);
 
                 handleDistanceVector(neighborId, neighborDistanceVector);
                 break;
         }
     }
 
-    public void startNode(){
+    public void startNodeVectorPropagation(){
         scheduler.scheduleAtFixedRate(() -> {
             if(running){
                 propagateDistanceVector();
+            }else{
+                stop();
             }
         }, propagationTimeout, propagationTimeout, TimeUnit.SECONDS);
     }
-
-    /*
-    @Override
-    public void run() {
-
-    }*/
 
     private int[][] initializeDistanceTable() {
         int numRows = neighbors.size() + 1;
@@ -132,7 +132,7 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
         thrd.start();
     }
 
-    private void handleDistanceTableRequest(short source) {
+    private void handleDistanceTableRequest(short source){
         rwLock.readLock().lock();
         try {
             String responseMessage = createDistanceTableResponsePDU();
@@ -237,12 +237,12 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
         return changed;
     }
 
-    private void propagateDistanceVector() {
+    private void propagateDistanceVector(){
         rwLock.readLock().lock();
         try {
             String propagateVectorMessage = createDistanceVectorMessage();
             for (Short neighbor : neighbors) {
-                getUnicastProtocol().upDataReq(neighbor, propagateVectorMessage);
+                System.out.println(getUnicastProtocol().upDataReq(neighbor, propagateVectorMessage));
             }
         } finally {
             rwLock.readLock().unlock();
@@ -253,14 +253,14 @@ public class RoutingInformationProtocolNode extends RoutingInformationProtocol i
         String responseMessage = "RIPRSP" + nodeId;
         StringBuilder formatDistanceTable = new StringBuilder();
 
-        for (int i = 0; i < distanceTable.length; i++) {
+        for (int[] distanceVector : distanceTable) {
             for (int j = 0; j < distanceTable[0].length; j++) {
                 if (j == distanceTable[0].length - 1) {
-                    formatDistanceTable.append(distanceTable[i][j]);
+                    formatDistanceTable.append(distanceVector[j]);
                     break;
                 }
 
-                formatDistanceTable.append(distanceTable[i][j]).append(":");
+                formatDistanceTable.append(distanceVector[j]).append(":");
             }
 
             formatDistanceTable.append(" ");

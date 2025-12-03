@@ -32,16 +32,17 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
             InetAddress address = InetAddress.getByName(hostname);
 
             String[] entityInformation = {
-                address.toString(),
+                address.getHostAddress(),
                 Integer.toString(portNumber),
             };
 
             setEntityMap(ucsapId, entityInformation);
 
             this.datagramSocket = new DatagramSocket(portNumber, address);
+            System.out.println("socket open");
 
         } catch (UnknownHostException | SocketException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException(e.getMessage());
         }
     }
 
@@ -51,6 +52,8 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
 
     @Override
     public boolean upDataReq(short destination, String message) {
+        System.out.println("tentando enviar algo");
+
         try{
             byte[] buffer = createMessage(message);
 
@@ -70,7 +73,8 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
 
             return true;
 
-        } catch (IOException ioe) {
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
             return false;
         }
     }
@@ -84,21 +88,24 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
                 DatagramPacket requestPack = new DatagramPacket(buffer, buffer.length);
                 datagramSocket.receive(requestPack);
 
+                System.out.println("recebeu o pacote");
+
                 String message = new String(requestPack.getData());
                 InetAddress sourceAddress = requestPack.getAddress();
                 int sourcePort = requestPack.getPort();
 
                 String[] sourceEntityInformation = {
-                        sourceAddress.toString(),
+                        sourceAddress.getHostAddress(),
                         Integer.toString(sourcePort)
                 };
 
-                short senderUcsapId = getSenderUcsapId(sourceEntityInformation);
+                System.out.println(Arrays.toString(sourceEntityInformation));
 
+                short senderUcsapId = getSenderUcsapId(sourceEntityInformation);
                 routingInformationProtocol.upDataInd(senderUcsapId, message);
             } catch (Exception e) {
-                stopRunning();
-                exit(-1);
+                System.err.println("Unicast thread error, ending program");
+                System.exit(-1);
             }
         }
     }
@@ -109,16 +116,25 @@ public class UnicastProtocol implements UnicastServiceInterface, Runnable{
         int messageSize = trimmedString.length();
         String formatMessage = "UPDREQPDU" + " " + messageSize + " " + trimmedString;
 
+        System.out.println(formatMessage);
+
         return formatMessage.getBytes();
     }
 
     private short getSenderUcsapId(String[] sourceEntityInformation){
         for(Map.Entry<Short, String[]> entry : entityMap.entrySet()){
-            if(Arrays.equals(entry.getValue(), sourceEntityInformation)) {
+            String[] entityInfo = entry.getValue();
+
+            //System.out.println(Arrays.toString(entityInfo));
+
+            if(entityInfo[0].equals(sourceEntityInformation[0]) &&
+                    entityInfo[1].equals(sourceEntityInformation[1])) {
+                System.out.println(entry.getKey());
                 return entry.getKey();
             }
         }
 
+        System.out.println("estive aqui");
         return -1;
     }
 
